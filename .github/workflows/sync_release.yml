@@ -18,7 +18,9 @@ jobs:
           LATEST_UV_TAG=$(echo "$LATEST_UV_JSON" | jq -r .tag_name)
           LATEST_UV_NOTES=$(echo "$LATEST_UV_JSON" | jq -r .body)
           echo "tag=$LATEST_UV_TAG" >> $GITHUB_OUTPUT
-          echo "notes=$LATEST_UV_NOTES" >> $GITHUB_OUTPUT
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$LATEST_UV_NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Get latest local release version
         id: get_local_version
