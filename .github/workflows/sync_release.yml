@@ -91,21 +91,21 @@ jobs:
           #### Gitee (推荐)
           \`\`\`sh
           # macOS / Linux
-          curl -LsSf $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
+          curl -LsSf $GITEE_REPO_URL/releases/latest/download/uv-installer-custom.sh | sh
           \`\`\`
           \`\`\`powershell
           # Windows (PowerShell)
-          powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
+          powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/latest/download/uv-installer-custom.ps1 | iex"
           \`\`\`
 
           #### GitHub (备用)
           \`\`\`sh
           # macOS / Linux
-          curl -LsSf $GITHUB_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
+          curl -LsSf $GITHUB_REPO_URL/releases/latest/download/uv-installer-custom.sh | sh
           \`\`\`
           \`\`\`powershell
           # Windows (PowerShell)
-          powershell -ExecutionPolicy Bypass -c "irm $GITHUB_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
+          powershell -ExecutionPolicy Bypass -c "irm $GITHUB_REPO_URL/releases/latest/download/uv-installer-custom.ps1 | iex"
           \`\`\`
 
           ---
@@ -117,11 +117,11 @@ jobs:
           #### Gitee (推荐)
           \`\`\`sh
           # macOS / Linux
-          curl -LsSf $GITEE_REPO_URL/releases/download/$RELEASE_TAG/setup_hooks.sh | sh
+          curl -LsSf $GITEE_REPO_URL/releases/latest/download/setup_hooks.sh | sh
           \`\`\`
           \`\`\`powershell
           # Windows (PowerShell)
-          powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/download/$RELEASE_TAG/setup_hooks.ps1 | iex"
+          powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/latest/download/setup_hooks.ps1 | iex"
           \`\`\`
           EOF
 
@@ -155,8 +155,8 @@ jobs:
             -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"$RELEASE_TAG\",\"refs\":\"main\",\"tag_message\":\"Release $RELEASE_TAG\"}"
           fi
 
-          # Try to get the ID of an existing release for this tag
-          RELEASE_ID=$(curl -s "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/tags/$RELEASE_TAG?access_token=$GITEE_TOKEN" | jq -r .id)
+          EXISTING_RELEASE_RESPONSE=$(curl -s "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/tags/$RELEASE_TAG?access_token=$GITEE_TOKEN")
+          RELEASE_ID=$(echo "$EXISTING_RELEASE_RESPONSE" | jq -r .id)
 
           if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
             echo "No existing Gitee release found for tag $RELEASE_TAG. Creating a new one..."
@@ -166,22 +166,28 @@ jobs:
               --argjson notes "$JSON_NOTES" \
               '{access_token: $token, tag_name: $tag, name: $tag, body: $notes, target_commitish: "main"}')
             
-            RELEASE_RESPONSE=$(curl -X POST --header 'Content-Type: application/json;charset=UTF-8' \
+            CREATE_RESPONSE=$(curl -X POST --header 'Content-Type: application/json;charset=UTF-8' \
               "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases" -d "$RELEASE_PAYLOAD")
 
-            RELEASE_ID=$(echo "$RELEASE_RESPONSE" | jq -r .id)
+            RELEASE_ID=$(echo "$CREATE_RESPONSE" | jq -r .id)
+            ASSET_COUNT=0
           else
-            echo "Found existing Gitee release with ID: $RELEASE_ID. Proceeding to upload/update assets."
+            echo "Found existing Gitee release with ID: $RELEASE_ID."
+            ASSET_COUNT=$(echo "$EXISTING_RELEASE_RESPONSE" | jq '.assets | length')
+            echo "It has $ASSET_COUNT assets."
           fi
-          echo "Gitee Release ID: $RELEASE_ID"
 
           if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
-            echo "Failed to create Gitee release or parse its ID."
-            echo "Response: $RELEASE_RESPONSE"
+            echo "Failed to create or find Gitee release."
             exit 1
           fi
 
-          echo "Uploading assets to Gitee..."
+          if [ "$ASSET_COUNT" -ge 4 ]; then
+            echo "Release already has 4 or more assets. Skipping upload."
+            exit 0
+          fi
+
+          echo "Uploading assets to Gitee Release ID: $RELEASE_ID..."
           for asset in uv-installer-custom.sh uv-installer-custom.ps1 setup_hooks.sh setup_hooks.ps1; do
             echo "Uploading $asset..."
             curl -X POST --header "Content-Type: multipart/form-data" \
