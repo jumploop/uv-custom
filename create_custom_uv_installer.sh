@@ -80,11 +80,6 @@ generate_powershell_installer() {
     /^\s*\$installer_base_url = "https:\/\/github\.com"/ {
         sub("https://github.com", proxy_url "/https://github.com")
     }
-    /^\s*\$wc = New-Object Net.Webclient/ {
-        print
-        print "  $wc.DownloadProgressChanged({ Write-Progress -Activity \"Downloading $app_name\" -CurrentOperation \"$($_.BytesReceived / 1MB).ToString(`\"F2`\") MB / $($_.TotalBytesToReceive / 1MB).ToString(`\"F2`\") MB\" -PercentComplete $_.ProgressPercentage })"
-        next
-    }
     /^\s*Write-Information "everything\x27s installed!"/ {
         print "  # --- Customization Start: Add default PyPI and Python download mirrors ---"
         print "  Write-Information \"Configuring default PyPI and Python download mirrors...\""
