@@ -30,7 +30,7 @@ jobs:
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
           GITEE_OWNER: "wangnov"
-          GITEE_REPO: "uv-mirror"
+          GITEE_REPO: "uv-custom"
         run: |
           LATEST_GITEE_TAG=$(curl -sL "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/latest?access_token=$GITEE_TOKEN" | jq -r .tag_name)
           echo "tag=$LATEST_GITEE_TAG" >> $GITHUB_OUTPUT
@@ -61,40 +61,20 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate custom installers
+        env:
+          DOWNLOAD_PROXY: ${{ vars.DOWNLOAD_PROXY }}
         run: |
           chmod +x ./create_custom_uv_installer.sh
           ./create_custom_uv_installer.sh ${{ needs.check_for_updates.outputs.new_tag }}
 
-      - name: Generate Release Notes
+      - name: Generate Unified Release Notes
         id: generate_notes
         run: |
           RELEASE_TAG="${{ needs.check_for_updates.outputs.new_tag }}"
           GITHUB_REPO_URL="https://github.com/${{ github.repository }}"
-          GITEE_REPO_URL="https://gitee.com/wangnov/uv-mirror" # Replace with your Gitee repo URL
+          GITEE_REPO_URL="https://gitee.com/wangnov/uv-custom"
 
-          # Notes for GitHub (Gitee is primary)
-          cat > github_notes.md <<EOF
-          ## 🚀 uv 国内加速版 (同步自 [$RELEASE_TAG](https://github.com/astral-sh/uv/releases/tag/$RELEASE_TAG))
-
-          **推荐使用 Gitee 源以获得最佳下载速度。**
-
-          ### Gitee (主推)
-          \`\`\`sh
-          # macOS / Linux
-          curl -LsSf $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
-          # Windows (PowerShell)
-          powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
-          \`\`\`
-
-          ### GitHub (备用)
-          \`\`\`sh
-          # macOS / Linux
-          curl -LsSf $GITHUB_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
-          \`\`\`
-          EOF
-
-          # Notes for Gitee (Gitee is primary)
-          cat > gitee_notes.md <<EOF
+          cat > release_notes.md <<EOF
           ## 🚀 uv 国内加速版 (同步自 uv官方版本 [$RELEASE_TAG](https://github.com/astral-sh/uv/releases/tag/$RELEASE_TAG))
 
           这是一个与 uv 官方版本同步的镜像版本，为国内用户提供了以下优化：
@@ -104,18 +84,28 @@ jobs:
 
           ---
 
-          ### 快速安装 (Gitee 源)
+          ### 快速安装
 
-          请根据您的操作系统，在终端中运行以下对应的一键安装命令：
+          请根据您的操作系统，在终端中运行以下对应的一键安装命令。**推荐使用 Gitee 源**。
 
-          #### macOS / Linux
+          #### Gitee (推荐)
           \`\`\`sh
+          # macOS / Linux
           curl -LsSf $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
           \`\`\`
-
-          #### Windows (PowerShell)
           \`\`\`powershell
+          # Windows (PowerShell)
           powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
+          \`\`\`
+
+          #### GitHub (备用)
+          \`\`\`sh
+          # macOS / Linux
+          curl -LsSf $GITHUB_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
+          \`\`\`
+          \`\`\`powershell
+          # Windows (PowerShell)
+          powershell -ExecutionPolicy Bypass -c "irm $GITHUB_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
           \`\`\`
 
           ---
@@ -124,13 +114,13 @@ jobs:
 
           如果您希望 \`uv\` 能够自动识别并管理当前激活的 Conda/Mamba 环境，可以运行以下对应的脚本来配置 Shell 钩子。
 
-          #### macOS / Linux
+          #### Gitee (推荐)
           \`\`\`sh
+          # macOS / Linux
           curl -LsSf $GITEE_REPO_URL/releases/download/$RELEASE_TAG/setup_hooks.sh | sh
           \`\`\`
-
-          #### Windows (PowerShell)
           \`\`\`powershell
+          # Windows (PowerShell)
           powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/download/$RELEASE_TAG/setup_hooks.ps1 | iex"
           \`\`\`
           EOF
@@ -141,7 +131,7 @@ jobs:
         run: |
           gh release create "${{ needs.check_for_updates.outputs.new_tag }}" \
             --title "${{ needs.check_for_updates.outputs.new_tag }}" \
-            --notes-file github_notes.md \
+            --notes-file release_notes.md \
             uv-installer-custom.sh \
             uv-installer-custom.ps1 \
             setup_hooks.sh \
@@ -151,14 +141,12 @@ jobs:
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
           RELEASE_TAG: ${{ needs.check_for_updates.outputs.new_tag }}
-          GITEE_OWNER: "wangnov" # Replace with your Gitee username/org
-          GITEE_REPO: "uv-mirror"  # Replace with your Gitee repo name
+          GITEE_OWNER: "wangnov"
+          GITEE_REPO: "uv-custom"
         run: |
           set -x
-          # Properly escape the notes for JSON payload
-          JSON_NOTES=$(jq -R -s '.' < gitee_notes.md)
+          JSON_NOTES=$(jq -R -s '.' < release_notes.md)
 
-          # Check if tag already exists on Gitee by checking curl's exit code
           if curl -s --fail "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/tags/$RELEASE_TAG?access_token=$GITEE_TOKEN" > /dev/null; then
             echo "Tag $RELEASE_TAG already exists on Gitee. Skipping tag creation."
           else
@@ -167,7 +155,6 @@ jobs:
             -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"$RELEASE_TAG\",\"refs\":\"main\",\"tag_message\":\"Release $RELEASE_TAG\"}"
           fi
 
-          # Check if release already exists on Gitee
           if curl -s --fail "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/tags/$RELEASE_TAG?access_token=$GITEE_TOKEN" > /dev/null; then
             echo "Release for tag $RELEASE_TAG already exists on Gitee. Skipping release creation."
             exit 0

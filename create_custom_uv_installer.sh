@@ -4,13 +4,14 @@
 #
 # This script fetches official installers from GitHub releases based on a
 # version tag, customizes them, and prepares them for release.
-# It is designed to be run in a CI/CD environment like GitHub Actions.
+# It reads the download proxy from the DOWNLOAD_PROXY environment variable.
 #
 
 set -e
 
 # --- Global Configuration ---
-DOWNLOAD_PROXY="https://ghfast.top"
+# Use DOWNLOAD_PROXY from environment, with a fallback default.
+DOWNLOAD_PROXY="${DOWNLOAD_PROXY:-https://ghfast.top}"
 PYPI_MIRROR="https://pypi.tuna.tsinghua.edu.cn/simple"
 UV_REPO="astral-sh/uv"
 
@@ -19,7 +20,6 @@ say() {
     echo "› $1"
 }
 
-# Fetches a file from a URL and saves it to a destination.
 fetch_file() {
     local url="$1"
     local dest="$2"
