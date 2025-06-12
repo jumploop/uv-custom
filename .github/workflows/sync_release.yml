@@ -167,6 +167,12 @@ jobs:
             -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"$RELEASE_TAG\",\"refs\":\"main\",\"tag_message\":\"Release $RELEASE_TAG\"}"
           fi
 
+          # Check if release already exists on Gitee
+          if curl -s --fail "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/tags/$RELEASE_TAG?access_token=$GITEE_TOKEN" > /dev/null; then
+            echo "Release for tag $RELEASE_TAG already exists on Gitee. Skipping release creation."
+            exit 0
+          fi
+
           echo "Creating Gitee Release..."
           RELEASE_PAYLOAD=$(jq -n \
             --arg token "$GITEE_TOKEN" \
