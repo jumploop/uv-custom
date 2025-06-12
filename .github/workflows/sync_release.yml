@@ -1,0 +1,67 @@
+name: Sync UV Release
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to create a release
+    steps:
+      - name: Get latest uv release version
+        id: get_uv_version
+        run: |
+          LATEST_UV_JSON=$(curl -sL https://api.github.com/repos/astral-sh/uv/releases/latest)
+          LATEST_UV_TAG=$(echo "$LATEST_UV_JSON" | jq -r .tag_name)
+          LATEST_UV_NOTES=$(echo "$LATEST_UV_JSON" | jq -r .body)
+          echo "tag=$LATEST_UV_TAG" >> $GITHUB_OUTPUT
+          echo "notes=$LATEST_UV_NOTES" >> $GITHUB_OUTPUT
+
+      - name: Get latest local release version
+        id: get_local_version
+        run: |
+          LATEST_LOCAL_TAG=$(curl -sL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
+          echo "tag=$LATEST_LOCAL_TAG" >> $GITHUB_OUTPUT
+
+      - name: Compare versions and decide to proceed
+        id: compare_versions
+        run: |
+          echo "Latest uv release: ${{ steps.get_uv_version.outputs.tag }}"
+          echo "Latest local release: ${{ steps.get_local_version.outputs.tag }}"
+          if [ "${{ steps.get_uv_version.outputs.tag }}" = "${{ steps.get_local_version.outputs.tag }}" ]; then
+            echo "Versions are the same. No new release needed."
+            echo "proceed=false" >> $GITHUB_OUTPUT
+          else
+            echo "New version detected. Proceeding with release."
+            echo "proceed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout repository
+        if: steps.compare_versions.outputs.proceed == 'true'
+        uses: actions/checkout@v4
+
+      - name: Generate custom installers
+        if: steps.compare_versions.outputs.proceed == 'true'
+        run: |
+          chmod +x ./create_custom_uv_installer.sh
+          ./create_custom_uv_installer.sh ${{ steps.get_uv_version.outputs.tag }}
+
+      - name: Create new release
+        if: steps.compare_versions.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UV_RELEASE_NOTES: ${{ steps.get_uv_version.outputs.notes }}
+        run: |
+          # Save release notes to a file to handle special characters safely
+          echo "$UV_RELEASE_NOTES" > release_notes.md
+
+          gh release create ${{ steps.get_uv_version.outputs.tag }} \
+            --title "Release ${{ steps.get_uv_version.outputs.tag }}" \
+            --notes-file release_notes.md \
+            uv-installer-custom.sh \
+            uv-installer-custom.ps1 \
+            setup_hooks.sh \
+            setup_hooks.ps1
