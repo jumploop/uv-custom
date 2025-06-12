@@ -1,4 +1,4 @@
-# uv 国内加速镜像
+# uv-custom: uv 国内加速镜像
 
 [![GitHub release](https://img.shields.io/github/v/release/Wangnov/uv-custom?display_name=tag&sort=semver&logo=github)](https://github.com/Wangnov/uv-custom/releases/latest)
 [![Sync Status](https://github.com/Wangnov/uv-custom/actions/workflows/sync_release.yml/badge.svg)](https://github.com/Wangnov/uv-custom/actions/workflows/sync_release.yml)
