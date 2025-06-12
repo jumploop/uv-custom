@@ -55,13 +55,53 @@ jobs:
         if: steps.compare_versions.outputs.proceed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          UV_RELEASE_NOTES: ${{ steps.get_uv_version.outputs.notes }}
+          RELEASE_TAG: ${{ steps.get_uv_version.outputs.tag }}
+          REPO_URL: "https://github.com/${{ github.repository }}"
         run: |
-          # Save release notes to a file to handle special characters safely
-          echo "$UV_RELEASE_NOTES" > release_notes.md
+          # Generate custom release notes
+          cat > release_notes.md <<EOF
+          ## 🚀 uv 国内加速版
 
-          gh release create ${{ steps.get_uv_version.outputs.tag }} \
-            --title "Release ${{ steps.get_uv_version.outputs.tag }}" \
+          这是一个与 uv 官方版本 **[$RELEASE_TAG](https://github.com/astral-sh/uv/releases/tag/$RELEASE_TAG)** 同步的镜像版本，为国内用户提供了以下优化：
+
+          - **下载加速**：所有uv可执行程序的 GitHub 下载链接均通过镜像代理，大幅提升下载速度。
+          - **预设镜像**：自动为您配置清华大学 PyPI 镜像和 Github 代理的 Python 构建镜像。
+
+          ---
+
+          ### 快速安装
+
+          请根据您的操作系统，在终端中运行以下对应的一键安装命令：
+
+          #### macOS / Linux
+          \`\`\`sh
+          curl -LsSf $REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
+          \`\`\`
+
+          #### Windows (PowerShell)
+          \`\`\`powershell
+          powershell -ExecutionPolicy Bypass -c "irm $REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
+          \`\`\`
+
+          ---
+
+          ### (可选) 配置 Conda/Mamba 环境联动
+
+          如果您希望 \`uv\` 能够自动识别并管理当前激活的 Conda/Mamba 环境，可以运行以下对应的脚本来配置 Shell 钩子。
+
+          #### macOS / Linux
+          \`\`\`sh
+          curl -LsSf $REPO_URL/releases/download/$RELEASE_TAG/setup_hooks.sh | sh
+          \`\`\`
+
+          #### Windows (PowerShell)
+          \`\`\`powershell
+          powershell -ExecutionPolicy Bypass -c "irm $REPO_URL/releases/download/$RELEASE_TAG/setup_hooks.ps1 | iex"
+          \`\`\`
+          EOF
+
+          gh release create "$RELEASE_TAG" \
+            --title "$RELEASE_TAG" \
             --notes-file release_notes.md \
             uv-installer-custom.sh \
             uv-installer-custom.ps1 \
