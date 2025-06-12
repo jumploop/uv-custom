@@ -20,21 +20,33 @@ jobs:
           echo "tag=$LATEST_UV_TAG" >> $GITHUB_OUTPUT
 
       - name: Get latest GitHub local release version
-        id: get_local_version
+        id: get_github_local_version
         run: |
-          LATEST_LOCAL_TAG=$(curl -sL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
-          echo "tag=$LATEST_LOCAL_TAG" >> $GITHUB_OUTPUT
+          LATEST_GITHUB_TAG=$(curl -sL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
+          echo "tag=$LATEST_GITHUB_TAG" >> $GITHUB_OUTPUT
+
+      - name: Get latest Gitee local release version
+        id: get_gitee_local_version
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITEE_OWNER: "wangnov"
+          GITEE_REPO: "uv-mirror"
+        run: |
+          LATEST_GITEE_TAG=$(curl -sL "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/latest?access_token=$GITEE_TOKEN" | jq -r .tag_name)
+          echo "tag=$LATEST_GITEE_TAG" >> $GITHUB_OUTPUT
 
       - name: Compare versions and decide to proceed
         id: compare_versions
         run: |
           echo "Latest uv release: ${{ steps.get_uv_version.outputs.tag }}"
-          echo "Latest local release: ${{ steps.get_local_version.outputs.tag }}"
-          if [ "${{ steps.get_uv_version.outputs.tag }}" = "${{ steps.get_local_version.outputs.tag }}" ]; then
-            echo "Versions are the same. No new release needed."
+          echo "Latest GitHub local release: ${{ steps.get_github_local_version.outputs.tag }}"
+          echo "Latest Gitee local release: ${{ steps.get_gitee_local_version.outputs.tag }}"
+          if [ "${{ steps.get_uv_version.outputs.tag }}" = "${{ steps.get_github_local_version.outputs.tag }}" ] && \
+             [ "${{ steps.get_uv_version.outputs.tag }}" = "${{ steps.get_gitee_local_version.outputs.tag }}" ]; then
+            echo "All repositories are up-to-date. No new release needed."
             echo "proceed=false" >> $GITHUB_OUTPUT
           else
-            echo "New version detected. Proceeding with release."
+            echo "New version detected or repositories are out of sync. Proceeding with release."
             echo "proceed=true" >> $GITHUB_OUTPUT
           fi
 
@@ -143,15 +155,26 @@ jobs:
           GITEE_REPO: "uv-mirror"  # Replace with your Gitee repo name
         run: |
           set -x
-          GITEE_NOTES=$(cat gitee_notes.md)
+          # Properly escape the notes for JSON payload
+          JSON_NOTES=$(jq -R -s '.' < gitee_notes.md)
 
-          echo "Creating Gitee Tag..."
-          curl -X POST --header 'Content-Type: application/json;charset=UTF-8' "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/tags" \
-          -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"$RELEASE_TAG\",\"refs\":\"main\",\"tag_message\":\"Release $RELEASE_TAG\"}"
+          # Check if tag already exists on Gitee
+          TAG_EXISTS=$(curl -s "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/tags/$RELEASE_TAG?access_token=$GITEE_TOKEN" | jq -r .name)
+
+          if [ "$TAG_EXISTS" = "$RELEASE_TAG" ]; then
+            echo "Tag $RELEASE_TAG already exists on Gitee. Skipping tag creation."
+          else
+            echo "Creating Gitee Tag..."
+            curl -X POST --header 'Content-Type: application/json;charset=UTF-8' "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/tags" \
+            -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"$RELEASE_TAG\",\"refs\":\"main\",\"tag_message\":\"Release $RELEASE_TAG\"}"
+          fi
 
           echo "Creating Gitee Release..."
-          RELEASE_RESPONSE=$(curl -X POST --header 'Content-Type: application/json;charset=UTF-8' "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases" \
-          -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"$RELEASE_TAG\",\"name\":\"$RELEASE_TAG\",\"body\":\"$GITEE_NOTES\",\"target_commitish\":\"main\"}")
+          RELEASE_PAYLOAD=$(jq -n --arg tag "$RELEASE_TAG" --arg notes "$JSON_NOTES" \
+            '{ "access_token": "'"$GITEE_TOKEN"'", "tag_name": $tag, "name": $tag, "body": $notes, "target_commitish": "main" }')
+          
+          RELEASE_RESPONSE=$(curl -X POST --header 'Content-Type: application/json;charset=UTF-8' \
+            "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases" -d "$RELEASE_PAYLOAD")
 
           RELEASE_ID=$(echo "$RELEASE_RESPONSE" | jq -r .id)
           echo "Gitee Release ID: $RELEASE_ID"
