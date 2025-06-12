@@ -1,4 +1,4 @@
-name: Sync UV Release
+name: Sync UV Release to GitHub & Gitee
 
 on:
   workflow_dispatch:
@@ -6,23 +6,20 @@ on:
     - cron: '*/5 * * * *'
 
 jobs:
-  sync:
+  check_for_updates:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # Required to create a release
+    outputs:
+      proceed: ${{ steps.compare_versions.outputs.proceed }}
+      new_tag: ${{ steps.get_uv_version.outputs.tag }}
     steps:
       - name: Get latest uv release version
         id: get_uv_version
         run: |
           LATEST_UV_JSON=$(curl -sL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/astral-sh/uv/releases/latest)
           LATEST_UV_TAG=$(echo "$LATEST_UV_JSON" | jq -r .tag_name)
-          LATEST_UV_NOTES=$(echo "$LATEST_UV_JSON" | jq -r .body)
           echo "tag=$LATEST_UV_TAG" >> $GITHUB_OUTPUT
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$LATEST_UV_NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Get latest local release version
+      - name: Get latest GitHub local release version
         id: get_local_version
         run: |
           LATEST_LOCAL_TAG=$(curl -sL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
@@ -41,46 +38,72 @@ jobs:
             echo "proceed=true" >> $GITHUB_OUTPUT
           fi
 
+  create_releases:
+    needs: check_for_updates
+    if: needs.check_for_updates.outputs.proceed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
       - name: Checkout repository
-        if: steps.compare_versions.outputs.proceed == 'true'
         uses: actions/checkout@v4
 
       - name: Generate custom installers
-        if: steps.compare_versions.outputs.proceed == 'true'
         run: |
           chmod +x ./create_custom_uv_installer.sh
-          ./create_custom_uv_installer.sh ${{ steps.get_uv_version.outputs.tag }}
+          ./create_custom_uv_installer.sh ${{ needs.check_for_updates.outputs.new_tag }}
 
-      - name: Create new release
-        if: steps.compare_versions.outputs.proceed == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.get_uv_version.outputs.tag }}
-          REPO_URL: "https://github.com/${{ github.repository }}"
+      - name: Generate Release Notes
+        id: generate_notes
         run: |
-          # Generate custom release notes
-          cat > release_notes.md <<EOF
-          ## 🚀 uv 国内加速版
+          RELEASE_TAG="${{ needs.check_for_updates.outputs.new_tag }}"
+          GITHUB_REPO_URL="https://github.com/${{ github.repository }}"
+          GITEE_REPO_URL="https://gitee.com/wangnov/uv-mirror" # Replace with your Gitee repo URL
 
-          这是一个与 uv 官方版本 **[$RELEASE_TAG](https://github.com/astral-sh/uv/releases/tag/$RELEASE_TAG)** 同步的镜像版本，为国内用户提供了以下优化：
+          # Notes for GitHub (Gitee is primary)
+          cat > github_notes.md <<EOF
+          ## 🚀 uv 国内加速版 (同步自 [$RELEASE_TAG](https://github.com/astral-sh/uv/releases/tag/$RELEASE_TAG))
 
-          - **下载加速**：所有uv可执行程序的 GitHub 下载链接均通过镜像代理，大幅提升下载速度。
-          - **预设镜像**：自动为您配置清华大学 PyPI 镜像和 Github 代理的 Python 构建镜像。
+          **推荐使用 Gitee 源以获得最佳下载速度。**
+
+          ### Gitee (主推)
+          \`\`\`sh
+          # macOS / Linux
+          curl -LsSf $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
+          # Windows (PowerShell)
+          powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
+          \`\`\`
+
+          ### GitHub (备用)
+          \`\`\`sh
+          # macOS / Linux
+          curl -LsSf $GITHUB_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
+          \`\`\`
+          EOF
+
+          # Notes for Gitee (Gitee is primary)
+          cat > gitee_notes.md <<EOF
+          ## 🚀 uv 国内加速版 (同步自 uv官方版本 [$RELEASE_TAG](https://github.com/astral-sh/uv/releases/tag/$RELEASE_TAG))
+
+          这是一个与 uv 官方版本同步的镜像版本，为国内用户提供了以下优化：
+
+          - **下载加速**：所有 GitHub 下载链接均通过镜像代理，大幅提升下载速度。
+          - **预设镜像**：自动为您配置清华大学 PyPI 镜像和 Python 构建镜像。
 
           ---
 
-          ### 快速安装
+          ### 快速安装 (Gitee 源)
 
           请根据您的操作系统，在终端中运行以下对应的一键安装命令：
 
           #### macOS / Linux
           \`\`\`sh
-          curl -LsSf $REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
+          curl -LsSf $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
           \`\`\`
 
           #### Windows (PowerShell)
           \`\`\`powershell
-          powershell -ExecutionPolicy Bypass -c "irm $REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
+          powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
           \`\`\`
 
           ---
@@ -91,19 +114,60 @@ jobs:
 
           #### macOS / Linux
           \`\`\`sh
-          curl -LsSf $REPO_URL/releases/download/$RELEASE_TAG/setup_hooks.sh | sh
+          curl -LsSf $GITEE_REPO_URL/releases/download/$RELEASE_TAG/setup_hooks.sh | sh
           \`\`\`
 
           #### Windows (PowerShell)
           \`\`\`powershell
-          powershell -ExecutionPolicy Bypass -c "irm $REPO_URL/releases/download/$RELEASE_TAG/setup_hooks.ps1 | iex"
+          powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/download/$RELEASE_TAG/setup_hooks.ps1 | iex"
           \`\`\`
           EOF
 
-          gh release create "$RELEASE_TAG" \
-            --title "$RELEASE_TAG" \
-            --notes-file release_notes.md \
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ needs.check_for_updates.outputs.new_tag }}" \
+            --title "${{ needs.check_for_updates.outputs.new_tag }}" \
+            --notes-file github_notes.md \
             uv-installer-custom.sh \
             uv-installer-custom.ps1 \
             setup_hooks.sh \
             setup_hooks.ps1
+
+      - name: Create Gitee Release
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          RELEASE_TAG: ${{ needs.check_for_updates.outputs.new_tag }}
+          GITEE_OWNER: "wangnov" # Replace with your Gitee username/org
+          GITEE_REPO: "uv-mirror"  # Replace with your Gitee repo name
+        run: |
+          set -x
+          GITEE_NOTES=$(cat gitee_notes.md)
+
+          echo "Creating Gitee Tag..."
+          curl -X POST --header 'Content-Type: application/json;charset=UTF-8' "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/tags" \
+          -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"$RELEASE_TAG\",\"refs\":\"main\",\"tag_message\":\"Release $RELEASE_TAG\"}"
+
+          echo "Creating Gitee Release..."
+          RELEASE_RESPONSE=$(curl -X POST --header 'Content-Type: application/json;charset=UTF-8' "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases" \
+          -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"$RELEASE_TAG\",\"name\":\"$RELEASE_TAG\",\"body\":\"$GITEE_NOTES\",\"target_commitish\":\"main\"}")
+
+          RELEASE_ID=$(echo "$RELEASE_RESPONSE" | jq -r .id)
+          echo "Gitee Release ID: $RELEASE_ID"
+
+          if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
+            echo "Failed to create Gitee release or parse its ID."
+            echo "Response: $RELEASE_RESPONSE"
+            exit 1
+          fi
+
+          echo "Uploading assets to Gitee..."
+          for asset in uv-installer-custom.sh uv-installer-custom.ps1 setup_hooks.sh setup_hooks.ps1; do
+            echo "Uploading $asset..."
+            curl -X POST --header "Content-Type: multipart/form-data" \
+            -F "access_token=$GITEE_TOKEN" \
+            -F "file=@$asset" \
+            "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/$RELEASE_ID/attach_files"
+          done
+          echo "All assets uploaded to Gitee."
