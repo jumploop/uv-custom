@@ -155,22 +155,24 @@ jobs:
             -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"$RELEASE_TAG\",\"refs\":\"main\",\"tag_message\":\"Release $RELEASE_TAG\"}"
           fi
 
-          if curl -s --fail "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/tags/$RELEASE_TAG?access_token=$GITEE_TOKEN" > /dev/null; then
-            echo "Release for tag $RELEASE_TAG already exists on Gitee. Skipping release creation."
-            exit 0
+          # Try to get the ID of an existing release for this tag
+          RELEASE_ID=$(curl -s "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/tags/$RELEASE_TAG?access_token=$GITEE_TOKEN" | jq -r .id)
+
+          if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
+            echo "No existing Gitee release found for tag $RELEASE_TAG. Creating a new one..."
+            RELEASE_PAYLOAD=$(jq -n \
+              --arg token "$GITEE_TOKEN" \
+              --arg tag "$RELEASE_TAG" \
+              --argjson notes "$JSON_NOTES" \
+              '{access_token: $token, tag_name: $tag, name: $tag, body: $notes, target_commitish: "main"}')
+            
+            RELEASE_RESPONSE=$(curl -X POST --header 'Content-Type: application/json;charset=UTF-8' \
+              "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases" -d "$RELEASE_PAYLOAD")
+
+            RELEASE_ID=$(echo "$RELEASE_RESPONSE" | jq -r .id)
+          else
+            echo "Found existing Gitee release with ID: $RELEASE_ID. Proceeding to upload/update assets."
           fi
-
-          echo "Creating Gitee Release..."
-          RELEASE_PAYLOAD=$(jq -n \
-            --arg token "$GITEE_TOKEN" \
-            --arg tag "$RELEASE_TAG" \
-            --argjson notes "$JSON_NOTES" \
-            '{access_token: $token, tag_name: $tag, name: $tag, body: $notes, target_commitish: "main"}')
-          
-          RELEASE_RESPONSE=$(curl -X POST --header 'Content-Type: application/json;charset=UTF-8' \
-            "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases" -d "$RELEASE_PAYLOAD")
-
-          RELEASE_ID=$(echo "$RELEASE_RESPONSE" | jq -r .id)
           echo "Gitee Release ID: $RELEASE_ID"
 
           if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
