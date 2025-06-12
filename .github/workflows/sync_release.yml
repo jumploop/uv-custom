@@ -91,21 +91,21 @@ jobs:
           #### Gitee (推荐)
           \`\`\`sh
           # macOS / Linux
-          curl -LsSf $GITEE_REPO_URL/releases/latest/download/uv-installer-custom.sh | sh
+          curl -LsSf $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
           \`\`\`
           \`\`\`powershell
           # Windows (PowerShell)
-          powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/latest/download/uv-installer-custom.ps1 | iex"
+          powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
           \`\`\`
 
           #### GitHub (备用)
           \`\`\`sh
           # macOS / Linux
-          curl -LsSf $GITHUB_REPO_URL/releases/latest/download/uv-installer-custom.sh | sh
+          curl -LsSf $GITHUB_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
           \`\`\`
           \`\`\`powershell
           # Windows (PowerShell)
-          powershell -ExecutionPolicy Bypass -c "irm $GITHUB_REPO_URL/releases/latest/download/uv-installer-custom.ps1 | iex"
+          powershell -ExecutionPolicy Bypass -c "irm $GITHUB_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
           \`\`\`
 
           ---
@@ -117,11 +117,11 @@ jobs:
           #### Gitee (推荐)
           \`\`\`sh
           # macOS / Linux
-          curl -LsSf $GITEE_REPO_URL/releases/latest/download/setup_hooks.sh | sh
+          curl -LsSf $GITEE_REPO_URL/releases/download/$RELEASE_TAG/setup_hooks.sh | sh
           \`\`\`
           \`\`\`powershell
           # Windows (PowerShell)
-          powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/latest/download/setup_hooks.ps1 | iex"
+          powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/download/$RELEASE_TAG/setup_hooks.ps1 | iex"
           \`\`\`
           EOF
 
