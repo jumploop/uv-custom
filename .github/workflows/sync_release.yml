@@ -128,14 +128,20 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.check_for_updates.outputs.new_tag }}
         run: |
-          gh release create "${{ needs.check_for_updates.outputs.new_tag }}" \
-            --title "${{ needs.check_for_updates.outputs.new_tag }}" \
-            --notes-file release_notes.md \
-            uv-installer-custom.sh \
-            uv-installer-custom.ps1 \
-            setup_hooks.sh \
-            setup_hooks.ps1
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists on GitHub. Skipping creation."
+          else
+            echo "Creating GitHub release $RELEASE_TAG..."
+            gh release create "$RELEASE_TAG" \
+              --title "$RELEASE_TAG" \
+              --notes-file release_notes.md \
+              uv-installer-custom.sh \
+              uv-installer-custom.ps1 \
+              setup_hooks.sh \
+              setup_hooks.ps1
+          fi
 
       - name: Create Gitee Release
         env:
