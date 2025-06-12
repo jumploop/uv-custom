@@ -14,7 +14,7 @@ jobs:
       - name: Get latest uv release version
         id: get_uv_version
         run: |
-          LATEST_UV_JSON=$(curl -sL https://api.github.com/repos/astral-sh/uv/releases/latest)
+          LATEST_UV_JSON=$(curl -sL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/astral-sh/uv/releases/latest)
           LATEST_UV_TAG=$(echo "$LATEST_UV_JSON" | jq -r .tag_name)
           LATEST_UV_NOTES=$(echo "$LATEST_UV_JSON" | jq -r .body)
           echo "tag=$LATEST_UV_TAG" >> $GITHUB_OUTPUT
