@@ -91,7 +91,7 @@ generate_powershell_installer() {
         print "default = true"
         print "\"@"
         print "  $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False"
-        print "  [IO.File]::WriteAllLines((Join-Path $receipt_home \"uv.toml\"), $toml_content, $Utf8NoBomEncoding)"
+        print "  [IO.File]::WriteAllLines((Join-Path ${env:APPDATA} \"uv.toml\"), $toml_content, $Utf8NoBomEncoding)"
         print "  Write-Information \"Default mirrors configured.\""
         print "  # --- Customization End ---"
         print ""
