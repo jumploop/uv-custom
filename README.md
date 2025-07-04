@@ -17,33 +17,23 @@
 
 ## 🚀 快速安装
 
-请根据您的操作系统，在终端中运行以下对应的一键安装命令。
+由于安装脚本是动态生成的，请访问项目的发布页面，以获取最新的一键安装命令。
 
 ### Gitee (主推)
 
-**通过此方式安装，可确保所有下载资源均来自国内服务器，实现纯净、高速的国内网络安装体验。**
+我们强烈推荐您通过 Gitee 的发布页面进行安装，以确保所有下载资源均来自国内服务器，实现纯净、高速的国内网络安装体验。
 
-```sh
-# macOS / Linux
-curl -LsSf https://gitee.com/wangnov/uv-custom/releases/latest/download/uv-installer-custom.sh | sh
-```
+👉 **[前往 Gitee Releases 页面](https://gitee.com/wangnov/uv-custom/releases)**
 
-```powershell
-# Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -c "irm https://gitee.com/wangnov/uv-custom/releases/latest/download/uv-installer-custom.ps1 | iex"
-```
+请在页面中找到最新的版本，并复制该版本下适合您操作系统的一键安装命令。
 
 ### GitHub (备用)
 
-```sh
-# macOS / Linux
-curl -LsSf https://github.com/Wangnov/uv-custom/releases/latest/download/uv-installer-custom.sh | sh
-```
+如果您无法访问 Gitee，也可以通过 GitHub 的发布页面获取安装命令。
 
-```powershell
-# Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/Wangnov/uv-custom/releases/latest/download/uv-installer-custom.ps1 | iex"
-```
+👉 **[前往 GitHub Releases 页面](https://github.com/Wangnov/uv-custom/releases)**
+
+请在页面中找到最新的版本，并复制该版本下适合您操作系统的一键安装命令。
 
 ---
 
