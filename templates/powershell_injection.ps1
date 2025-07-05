@@ -28,5 +28,6 @@ $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
 Write-Information "✅ 配置完成。镜像设置如下:"
 Write-Information "   - Python 下载代理: $uv_download_proxy_url"
 Write-Information "   - PyPI 镜像源: $uv_pypi_mirror_url"
+Write-Information "   - uv 版本: $app_version"
 Write-Information "   - 配置文件路径: $uv_config_path"
 # --- Customization End --- 
