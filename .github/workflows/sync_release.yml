@@ -113,20 +113,21 @@ jobs:
 
           ### 高级用法：自定义镜像源
 
-          您可以在运行一键安装命令前，通过设置环境变量来临时指定下载代理和 PyPI 镜像。
+          您可以在运行一键安装命令前，通过设置环境变量来临时指定下载代理和 PyPI 镜像。并可以选择下载不同的uv版本。
 
           - `UV_DOWNLOAD_PROXY`: 用于 `uv` 和 Python 的下载代理 (例如: `https://ghproxy.com`)
           - `UV_PYPI_MIRROR`: PyPI 镜像源 (例如: `https://mirrors.aliyun.com/pypi/simple/`)
+          - `UV_VERSION`: 选择下载不同的uv版本 (例如: `0.7.19`)
 
           #### macOS / Linux 示例
           \`\`\`sh
-          UV_DOWNLOAD_PROXY="https://ghproxy.com" UV_PYPI_MIRROR="https://mirrors.aliyun.com/pypi/simple/" \
+          UV_DOWNLOAD_PROXY="https://ghproxy.com" UV_PYPI_MIRROR="https://mirrors.aliyun.com/pypi/simple/" UV_VERSION="0.7.19" \
           curl -LsSf $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
           \`\`\`
 
           #### Windows (PowerShell) 示例
           \`\`\`powershell
-          $env:UV_DOWNLOAD_PROXY="https://ghproxy.com"; $env:UV_PYPI_MIRROR="https://mirrors.aliyun.com/pypi/simple/"; \
+          $env:UV_DOWNLOAD_PROXY="https://ghproxy.com"; $env:UV_PYPI_MIRROR="https://mirrors.aliyun.com/pypi/simple/"; $env:UV_VERSION="0.7.19"; \
           powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
           \`\`\`
 

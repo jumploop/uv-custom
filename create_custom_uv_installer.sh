@@ -120,13 +120,15 @@ generate_powershell_installer() {
 }
 
 # --- Main Execution ---
-if [ -z "$1" ]; then
-    echo "Error: A version tag must be provided as the first argument." >&2
-    echo "Usage: $0 <version_tag>" >&2
+# Determine version from UV_VERSION env var, with fallback to the first argument
+VERSION_TAG="${UV_VERSION:-$1}"
+
+if [ -z "$VERSION_TAG" ]; then
+    echo "Error: A version tag must be provided via the UV_VERSION environment variable or as the first argument." >&2
+    echo "Usage: UV_VERSION=<version_tag> $0" >&2
+    echo "   or: $0 <version_tag>" >&2
     exit 1
 fi
-
-VERSION_TAG="$1"
 
 say "Starting custom installer generation for uv version: $VERSION_TAG"
 generate_shell_installer "$VERSION_TAG"
