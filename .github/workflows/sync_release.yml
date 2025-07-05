@@ -81,6 +81,7 @@ jobs:
 
           - **下载加速**：所有 GitHub 下载链接均通过镜像代理，大幅提升下载速度。
           - **预设镜像**：自动为您配置清华大学 PyPI 镜像和 Python 构建镜像。
+          - **灵活配置**：支持通过环境变量临时覆盖默认的下载代理和 PyPI 镜像。
 
           ---
 
@@ -106,6 +107,27 @@ jobs:
           \`\`\`powershell
           # Windows (PowerShell)
           powershell -ExecutionPolicy Bypass -c "irm $GITHUB_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
+          \`\`\`
+
+          ---
+
+          ### 高级用法：自定义镜像源
+
+          您可以在运行一键安装命令前，通过设置环境变量来临时指定下载代理和 PyPI 镜像。
+
+          - `UV_DOWNLOAD_PROXY`: 用于 `uv` 和 Python 的下载代理 (例如: `https://ghproxy.com`)
+          - `UV_PYPI_MIRROR`: PyPI 镜像源 (例如: `https://mirrors.aliyun.com/pypi/simple/`)
+
+          #### macOS / Linux 示例
+          \`\`\`sh
+          UV_DOWNLOAD_PROXY="https://ghproxy.com" UV_PYPI_MIRROR="https://mirrors.aliyun.com/pypi/simple/" \
+          curl -LsSf $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.sh | sh
+          \`\`\`
+
+          #### Windows (PowerShell) 示例
+          \`\`\`powershell
+          $env:UV_DOWNLOAD_PROXY="https://ghproxy.com"; $env:UV_PYPI_MIRROR="https://mirrors.aliyun.com/pypi/simple/"; \
+          powershell -ExecutionPolicy Bypass -c "irm $GITEE_REPO_URL/releases/download/$RELEASE_TAG/uv-installer-custom.ps1 | iex"
           \`\`\`
 
           ---
