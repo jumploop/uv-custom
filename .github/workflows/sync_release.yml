@@ -170,7 +170,7 @@ jobs:
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
           RELEASE_TAG: ${{ needs.check_for_updates.outputs.new_tag }}
-          GITEE_OWNER: "wangnov"
+          GITEE_OWNER: "jumploop"
           GITEE_REPO: "uv-custom"
         run: |
           set -x
