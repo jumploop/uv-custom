@@ -29,7 +29,7 @@ jobs:
         id: get_gitee_local_version
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-          GITEE_OWNER: "wangnov"
+          GITEE_OWNER: "jumploop"
           GITEE_REPO: "uv-custom"
         run: |
           LATEST_GITEE_TAG=$(curl -sL "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/latest?access_token=$GITEE_TOKEN" | jq -r .tag_name)
@@ -72,7 +72,7 @@ jobs:
         run: |
           RELEASE_TAG="${{ needs.check_for_updates.outputs.new_tag }}"
           GITHUB_REPO_URL="https://github.com/${{ github.repository }}"
-          GITEE_REPO_URL="https://gitee.com/wangnov/uv-custom"
+          GITEE_REPO_URL="https://gitee.com/jumploop/uv-custom"
 
           cat > release_notes.md <<EOF
           ## 🚀 uv 国内加速版 (同步自 uv官方版本 [$RELEASE_TAG](https://github.com/astral-sh/uv/releases/tag/$RELEASE_TAG))
