@@ -1,7 +1,7 @@
 # uv-custom: uv 国内加速镜像
 
-[![GitHub release](https://img.shields.io/github/v/release/Wangnov/uv-custom?display_name=tag&sort=semver&logo=github)](https://github.com/Wangnov/uv-custom/releases/latest)
-[![Sync Status](https://github.com/Wangnov/uv-custom/actions/workflows/sync_release.yml/badge.svg)](https://github.com/Wangnov/uv-custom/actions/workflows/sync_release.yml)
+[![GitHub release](https://img.shields.io/github/v/release/jumploop/uv-custom?display_name=tag&sort=semver&logo=github)](https://github.com/jumploop/uv-custom/releases/latest)
+[![Sync Status](https://github.com/jumploop/uv-custom/actions/workflows/sync_release.yml/badge.svg)](https://github.com/jumploop/uv-custom/actions/workflows/sync_release.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 这是一个与 [astral-sh/uv](https://github.com/astral-sh/uv) 官方版本同步的镜像项目，旨在为国内用户提供更快速、更稳定的 `uv` 安装和使用体验。
@@ -24,7 +24,7 @@
 
 我们强烈推荐您通过 Gitee 的发布页面进行安装，以确保所有下载资源均来自国内服务器，实现纯净、高速的国内网络安装体验。
 
-👉 **[前往 Gitee Releases 页面](https://gitee.com/wangnov/uv-custom/releases)**
+👉 **[前往 Gitee Releases 页面](https://gitee.com/jumploop/uv-custom/releases)**
 
 请在页面中找到最新的版本，并复制该版本下适合您操作系统的一键安装命令。
 
@@ -32,7 +32,7 @@
 
 如果您无法访问 Gitee，也可以通过 GitHub 的发布页面获取安装命令。
 
-👉 **[前往 GitHub Releases 页面](https://github.com/Wangnov/uv-custom/releases)**
+👉 **[前往 GitHub Releases 页面](https://github.com/jumploop/uv-custom/releases)**
 
 请在页面中找到最新的版本，并复制该版本下适合您操作系统的一键安装命令。
 
@@ -46,12 +46,12 @@
 
 ```sh
 # macOS / Linux
-curl -LsSf https://gitee.com/wangnov/uv-custom/releases/latest/download/setup_hooks.sh | sh
+curl -LsSf https://gitee.com/jumploop/uv-custom/releases/latest/download/setup_hooks.sh | sh
 ```
 
 ```powershell
 # Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -c "irm https://gitee.com/wangnov/uv-custom/releases/latest/download/setup_hooks.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://gitee.com/jumploop/uv-custom/releases/latest/download/setup_hooks.ps1 | iex"
 ```
 
 ---
