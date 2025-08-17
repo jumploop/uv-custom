@@ -30,12 +30,12 @@
 
 ```sh
 # macOS / Linux
-curl -LsSf https://gitee.com/wangnov/uv-custom/releases/download/latest/uv-installer-custom.sh | sh
+curl -LsSf https://gitee.com/jumploop/uv-custom/releases/download/latest/uv-installer-custom.sh | sh
 ```
 
 ```powershell
 # Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -c "irm https://gitee.com/wangnov/uv-custom/releases/download/latest/uv-installer-custom.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://gitee.com/jumploop/uv-custom/releases/download/latest/uv-installer-custom.ps1 | iex"
 ```
 
 ### GitHub (备用)
@@ -48,12 +48,12 @@ powershell -ExecutionPolicy Bypass -c "irm https://gitee.com/wangnov/uv-custom/r
 
 ```sh
 # macOS / Linux
-curl -LsSf https://github.com/Wangnov/uv-custom/releases/download/latest/uv-installer-custom.sh | sh
+curl -LsSf https://github.com/jumploop/uv-custom/releases/download/latest/uv-installer-custom.sh | sh
 ```
 
 ```powershell
 # Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/Wangnov/uv-custom/releases/download/latest/uv-installer-custom.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/jumploop/uv-custom/releases/download/latest/uv-installer-custom.ps1 | iex"
 ```
 
 高级用法请参考发布页面。
