@@ -12,7 +12,7 @@
 - **预设镜像**：自动为您配置清华大学 PyPI 镜像和 Python 构建镜像。
 - **自动同步**：通过 GitHub Actions，每 5 分钟检查一次官方版本，并自动发布同步的镜像版本到 GitHub 和 Gitee。
 - **一键安装**：提供平台原生的一键安装命令，无需手动下载或授权。
-- **灵活配置**：您可以在运行一键安装命令时，通过设置 `UV_DOWNLOAD_PROXY` 和 `UV_PYPI_MIRROR` 环境变量来临时覆盖默认的下载代理和 PyPI 镜像源，以适应不同的网络环境。通过设置 `UV_VERSION` 来选择下载不同的uv版本。
+- **灵活配置**：您可以在运行一键安装命令时，通过设置 `UV_DOWNLOAD_PROXY` 和 `UV_PYPI_MIRROR` 环境变量来临时覆盖默认的下载代理和 PyPI 镜像源，以适应不同的网络环境。通过设置 `UV_VERSION` 来选择下载不同的 uv 版本。
 
 ---
 
@@ -28,6 +28,16 @@
 
 请在页面中找到最新的版本，并复制该版本下适合您操作系统的一键安装命令。
 
+```sh
+# macOS / Linux
+curl -LsSf https://gitee.com/wangnov/uv-custom/releases/download/latest/uv-installer-custom.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+powershell -ExecutionPolicy Bypass -c "irm https://gitee.com/wangnov/uv-custom/releases/download/latest/uv-installer-custom.ps1 | iex"
+```
+
 ### GitHub (备用)
 
 如果您无法访问 Gitee，也可以通过 GitHub 的发布页面获取安装命令。
@@ -35,6 +45,18 @@
 👉 **[前往 GitHub Releases 页面](https://github.com/jumploop/uv-custom/releases)**
 
 请在页面中找到最新的版本，并复制该版本下适合您操作系统的一键安装命令。
+
+```sh
+# macOS / Linux
+curl -LsSf https://github.com/Wangnov/uv-custom/releases/download/latest/uv-installer-custom.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/Wangnov/uv-custom/releases/download/latest/uv-installer-custom.ps1 | iex"
+```
+
+高级用法请参考发布页面。
 
 ---
 
