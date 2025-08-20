@@ -72,7 +72,8 @@ s|INSTALLER_BASE_URL=\"\${UV_INSTALLER_GITHUB_BASE_URL:-https://github.com}\"|IN
         "$TEMPLATES_DIR/shell_injection.sh" >> "$dest_installer"
     
     # Write the injection point line itself
-    echo "say \"everything's installed!\"" >> "$dest_installer"
+    echo "" >> "$dest_installer"  # Add a newline for separation
+    echo  "say \"everything's installed!\"" >> "$dest_installer"
 
     # Get the total lines of the file and write the rest of the original script
     local total_lines
@@ -99,7 +100,7 @@ generate_powershell_installer() {
 
     # Rebuild the script with all custom logic injected from the template
     local injection_line
-    injection_line=$(grep -n "function Install-Binary" "$tmp_installer" | head -n 1 | cut -d: -f1)
+    injection_line=$(grep -n "Write-Information \"everything's installed!\"" "$tmp_installer" | head -n 1 | cut -d: -f1)
     
     # Write content before the injection point
     head -n "$((injection_line - 1))" "$tmp_installer" > "$dest_installer"
@@ -111,7 +112,7 @@ generate_powershell_installer() {
 
     # Add a newline for separation before appending the rest of the script
     echo "" >> "$dest_installer"
-
+    echo "  Write-Information \"everything's installed!\"" >> "$dest_installer"
     # Write the rest of the original script
     tail -n "+$injection_line" "$tmp_installer" >> "$dest_installer"
 
