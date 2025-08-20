@@ -15,12 +15,12 @@
     New-Item -Path $uv_config_dir -ItemType Directory -Force | Out-Null
   }
   $toml_content = @"
-  python-install-mirror = "$python_install_mirror_url"
+python-install-mirror = "$python_install_mirror_url"
 
-  [[index]]
-  url = "$uv_pypi_mirror_url"
-  default = true
-  "@
+[[index]]
+url = "$uv_pypi_mirror_url"
+default = true
+"@
   $uv_config_path = Join-Path $uv_config_dir "uv.toml"
   $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
   [IO.File]::WriteAllText($uv_config_path, $toml_content, $Utf8NoBomEncoding)

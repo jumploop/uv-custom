@@ -73,7 +73,7 @@ s|INSTALLER_BASE_URL=\"\${UV_INSTALLER_GITHUB_BASE_URL:-https://github.com}\"|IN
     
     # Write the injection point line itself
     echo "" >> "$dest_installer"  # Add a newline for separation
-    echo  "say \"everything's installed!\"" >> "$dest_installer"
+    echo  "    say \"everything's installed!\"" >> "$dest_installer"
 
     # Get the total lines of the file and write the rest of the original script
     local total_lines
@@ -112,7 +112,6 @@ generate_powershell_installer() {
 
     # Add a newline for separation before appending the rest of the script
     echo "" >> "$dest_installer"
-    echo "  Write-Information \"everything's installed!\"" >> "$dest_installer"
     # Write the rest of the original script
     tail -n "+$injection_line" "$tmp_installer" >> "$dest_installer"
 
