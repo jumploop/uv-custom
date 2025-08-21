@@ -117,9 +117,9 @@ generate_powershell_installer() {
     echo "" >> "$dest_installer"
     # Write the rest of the original script
     tail -n "+$injection_line" "$tmp_installer" >> "$dest_installer"
-    app_version="if (\$env:UV_VERSION) { \$app_version = \$env:UV_VERSION } else { \$app_version = \"$version\" }"
-    sed -i "s|^\$app_version = \'\([0-9\.]\+\)\'|$app_version|" "$dest_installer"
-    sed -i -e "s|\(\$installer_base_url\/astral-sh\/uv\/releases\/download\/\)\.\+\"|\1\$app_version\"|" -e \
+    app_version="if \(\$env:UV_VERSION\) \{ \$app_version = \$env:UV_VERSION \} else \{ \$app_version = \"$version\" \}"
+    sed -i "s|$(grep "\$app_version = " "$dest_installer")|$app_version|" "$dest_installer"
+    sed -i -e "s|\(\$installer_base_url\/astral-sh\/uv\/releases\/download\/\).\+\"|\1\$app_version\"|" -e \
     "s|\(\"release_type\":\"github\"\},\)\"version\":\".\+\"\}$|\1\"version\"\:\"\$app_version\"\}|" "$dest_installer"
 
     rm "$tmp_installer"
