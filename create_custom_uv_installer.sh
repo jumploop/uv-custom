@@ -81,6 +81,9 @@ s|INSTALLER_BASE_URL=\"\${UV_INSTALLER_GITHUB_BASE_URL:-https://github.com}\"|IN
     if [ "$injection_line" -lt "$total_lines" ]; then
         tail -n "+$((injection_line + 1))" "$tmp_proxied" >> "$dest_installer"
     fi
+    sed -i "s|APP_VERSION=\"\([0-9\.]\+\)\"|APP_VERSION=\"\${UV_VERSION:-\\1}\"|" "$dest_installer"
+    sed -i -e "s|astral-sh\/uv\/releases\/download\/.\+\"|astral-sh\/uv\/releases\/download\/\$APP_VERSION\"|" -e \
+    "s|\(\"release_type\":\"github\"\},\)\"version\":\".\+\"\}$|\1\"version\"\:\"\$APP_VERSION\"\}|" "$dest_installer"
 
     rm "$tmp_installer" "$tmp_proxied"
     chmod +x "$dest_installer"
@@ -114,6 +117,10 @@ generate_powershell_installer() {
     echo "" >> "$dest_installer"
     # Write the rest of the original script
     tail -n "+$injection_line" "$tmp_installer" >> "$dest_installer"
+    app_version="if (\$env:UV_VERSION) { \$app_version = \$env:UV_VERSION } else { \$app_version = \"$version\" }"
+    sed -i "s|^\$app_version = \'\([0-9\.]\+\)\'|$app_version|" "$dest_installer"
+    sed -i -e "s|\(\$installer_base_url\/astral-sh\/uv\/releases\/download\/\)\.\+\"|\1\$app_version\"|" -e \
+    "s|\(\"release_type\":\"github\"\},\)\"version\":\".\+\"\}$|\1\"version\"\:\"\$app_version\"\}|" "$dest_installer"
 
     rm "$tmp_installer"
     say "Successfully created custom installer: $dest_installer"
