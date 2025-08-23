@@ -1,9 +1,4 @@
   # This script block is injected by create_custom_uv_installer.sh
-  # --- Customization: Define runtime proxy URL and override ArtifactDownloadUrl ---
-  if ($env:UV_DOWNLOAD_PROXY) { $uv_download_proxy_url = $env:UV_DOWNLOAD_PROXY } else { $uv_download_proxy_url = "__DOWNLOAD_PROXY__" }
-  $ArtifactDownloadUrl = "$uv_download_proxy_url/https://github.com/astral-sh/uv/releases/download/$app_version"
-
-
   # --- Customization: Add default PyPI and Python download mirrors ---
   Write-Information "正在配置默认的 PyPI 和 Python 下载镜像..."
 
