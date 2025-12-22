@@ -3,7 +3,7 @@ name: Sync UV Release to GitHub & Gitee
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '* */4 * * *'
 
 jobs:
   check_for_updates:
