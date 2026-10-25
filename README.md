@@ -48,12 +48,12 @@ powershell -ExecutionPolicy Bypass -c "irm https://gitee.com/jumploop/uv-custom/
 
 ```sh
 # macOS / Linux
-curl -LsSf https://github.com/jumploop/uv-custom/releases/download/latest/uv-installer-custom.sh | sh
+curl -LsSf https://github.com/jumploop/uv-custom/releases/latest/download/uv-installer-custom.sh | sh
 ```
 
 ```powershell
 # Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/jumploop/uv-custom/releases/download/latest/uv-installer-custom.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/jumploop/uv-custom/releases/latest/download/uv-installer-custom.ps1 | iex"
 ```
 
 高级用法请参考发布页面。
@@ -68,12 +68,12 @@ powershell -ExecutionPolicy Bypass -c "irm https://github.com/jumploop/uv-custom
 
 ```sh
 # macOS / Linux
-curl -LsSf https://gitee.com/jumploop/uv-custom/releases/latest/download/setup_hooks.sh | sh
+curl -LsSf https://gitee.com/jumploop/uv-custom/releases/download/latest/setup_hooks.sh | sh
 ```
 
 ```powershell
 # Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -c "irm https://gitee.com/jumploop/uv-custom/releases/latest/download/setup_hooks.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://gitee.com/jumploop/uv-custom/releases/download/latest/setup_hooks.ps1 | iex"
 ```
 
 ---

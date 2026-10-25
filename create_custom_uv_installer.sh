@@ -95,10 +95,20 @@ UV_INSTALLER_GITHUB_BASE_URL=\"\${UV_INSTALLER_GITHUB_BASE_URL:-\${_UV_DOWNLOAD_
         -e "s|__PYPI_MIRROR__|$PYPI_MIRROR|g" \
         "$TEMPLATES_DIR/shell_injection.sh" >"$template"
     inject_before "$dest_installer" "say \"everything's installed!\"" "$template"
-    rm -f "$tmp_installer" "$template"
+
+    local checksum_template
+    checksum_template=$(mktemp)
+    sed "s|__GENERATED_VERSION__|$version|g" \
+        "$TEMPLATES_DIR/shell_checksum.sh" >"$checksum_template"
+    inject_before "$dest_installer" 'if [ -n "${_checksum_style:-}" ]; then' "$checksum_template"
+    rm -f "$tmp_installer" "$template" "$checksum_template"
 
     grep -q 'UV_INSTALLER_GITHUB_BASE_URL=' "$dest_installer"
-    grep -q '__DOWNLOAD_PROXY__\|__PYPI_MIRROR__' "$dest_installer" && {
+    grep -q 'failed to download checksum' "$dest_installer" || {
+        echo "Error: checksum fallback was not injected into $dest_installer" >&2
+        exit 1
+    }
+    grep -q '__DOWNLOAD_PROXY__\|__PYPI_MIRROR__\|__GENERATED_VERSION__' "$dest_installer" && {
         echo "Error: unresolved placeholder in $dest_installer" >&2
         exit 1
     }

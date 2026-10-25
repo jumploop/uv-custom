@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: '*/5 * * * *'
 
+concurrency:
+  group: sync-uv-release
+  cancel-in-progress: false
+
 jobs:
   check_for_updates:
     runs-on: ubuntu-latest
@@ -190,7 +194,15 @@ jobs:
           RELEASE_TAG: ${{ needs.check_for_updates.outputs.new_tag }}
         run: |
           if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
-            echo "Release $RELEASE_TAG already exists on GitHub. Skipping creation."
+            echo "Release $RELEASE_TAG already exists on GitHub. Ensuring assets are present."
+            EXISTING_GITHUB_ASSETS=$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')
+            for asset in uv-installer-custom.sh uv-installer-custom.ps1 setup_hooks.sh setup_hooks.ps1; do
+              if grep -Fxq "$asset" <<< "$EXISTING_GITHUB_ASSETS"; then
+                echo "Skipping existing asset: $asset"
+              else
+                gh release upload "$RELEASE_TAG" "$asset"
+              fi
+            done
           else
             echo "Creating GitHub release $RELEASE_TAG..."
             gh release create "$RELEASE_TAG" \
@@ -209,18 +221,44 @@ jobs:
           GITEE_OWNER: "jumploop"
           GITEE_REPO: "uv-custom"
         run: |
-          set -x
+          set -euo pipefail
           JSON_NOTES=$(jq -R -s '.' < release_notes.md)
 
-          if curl -s --fail "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/tags/$RELEASE_TAG?access_token=$GITEE_TOKEN" > /dev/null; then
+          gitee_request() {
+            local response
+            response=$(curl -sS --fail "$@") || return 1
+            printf '%s' "$response"
+          }
+
+          if gitee_request "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/tags/$RELEASE_TAG?access_token=$GITEE_TOKEN" > /dev/null; then
             echo "Tag $RELEASE_TAG already exists on Gitee. Skipping tag creation."
           else
             echo "Creating Gitee Tag..."
-            curl -X POST --header 'Content-Type: application/json;charset=UTF-8' "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/tags" \
-            -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"$RELEASE_TAG\",\"refs\":\"main\",\"tag_message\":\"Release $RELEASE_TAG\"}"
+            gitee_request -X POST --header 'Content-Type: application/json;charset=UTF-8' \
+              "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/tags" \
+              -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"$RELEASE_TAG\",\"refs\":\"main\",\"tag_message\":\"Release $RELEASE_TAG\"}" > /dev/null
           fi
 
-          EXISTING_RELEASE_RESPONSE=$(curl -s "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/tags/$RELEASE_TAG?access_token=$GITEE_TOKEN")
+          RELEASE_RESPONSE_FILE=$(mktemp)
+          RELEASE_HTTP_CODE=$(curl -sS \
+            -w '%{http_code}' \
+            -o "$RELEASE_RESPONSE_FILE" \
+            "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/tags/$RELEASE_TAG?access_token=$GITEE_TOKEN") || {
+              rm -f "$RELEASE_RESPONSE_FILE"
+              echo "Failed to query Gitee release for tag $RELEASE_TAG." >&2
+              exit 1
+            }
+          EXISTING_RELEASE_RESPONSE=$(cat "$RELEASE_RESPONSE_FILE")
+          rm -f "$RELEASE_RESPONSE_FILE"
+          case "$RELEASE_HTTP_CODE" in
+            200) ;;
+            404) EXISTING_RELEASE_RESPONSE='{}' ;;
+            *)
+              echo "Gitee release query failed with HTTP status $RELEASE_HTTP_CODE." >&2
+              echo "$EXISTING_RELEASE_RESPONSE" >&2
+              exit 1
+              ;;
+          esac
           RELEASE_ID=$(echo "$EXISTING_RELEASE_RESPONSE" | jq -r .id)
 
           if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
@@ -231,7 +269,7 @@ jobs:
               --argjson notes "$JSON_NOTES" \
               '{access_token: $token, tag_name: $tag, name: $tag, body: $notes, target_commitish: "main"}')
             
-            CREATE_RESPONSE=$(curl -X POST --header 'Content-Type: application/json;charset=UTF-8' \
+            CREATE_RESPONSE=$(gitee_request -X POST --header 'Content-Type: application/json;charset=UTF-8' \
               "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases" -d "$RELEASE_PAYLOAD")
 
             RELEASE_ID=$(echo "$CREATE_RESPONSE" | jq -r .id)
@@ -247,17 +285,16 @@ jobs:
             exit 1
           fi
 
-          if [ "$ASSET_COUNT" -ge 4 ]; then
-            echo "Release already has 4 or more assets. Skipping upload."
-            exit 0
-          fi
-
-          echo "Uploading assets to Gitee Release ID: $RELEASE_ID..."
+          echo "Ensuring assets are uploaded to Gitee Release ID: $RELEASE_ID..."
           for asset in uv-installer-custom.sh uv-installer-custom.ps1 setup_hooks.sh setup_hooks.ps1; do
+            if [ "$ASSET_COUNT" -gt 0 ] && echo "$EXISTING_RELEASE_RESPONSE" | jq -e --arg name "$asset" '.assets[] | select(.name == $name)' > /dev/null; then
+              echo "Skipping existing asset: $asset"
+              continue
+            fi
             echo "Uploading $asset..."
-            curl -X POST --header "Content-Type: multipart/form-data" \
-            -F "access_token=$GITEE_TOKEN" \
-            -F "file=@$asset" \
-            "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/$RELEASE_ID/attach_files"
+            gitee_request -X POST --header "Content-Type: multipart/form-data" \
+              -F "access_token=$GITEE_TOKEN" \
+              -F "file=@$asset" \
+              "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/$RELEASE_ID/attach_files" > /dev/null
           done
           echo "All assets uploaded to Gitee."
