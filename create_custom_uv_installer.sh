@@ -11,7 +11,7 @@ set -e
 
 # --- Global Configuration ---
 # Use UV_DOWNLOAD_PROXY and UV_PYPI_MIRROR from environment, with fallback defaults.
-DOWNLOAD_PROXY="${UV_DOWNLOAD_PROXY:-https://ghfast.top}"
+DOWNLOAD_PROXY="${UV_DOWNLOAD_PROXY:-https://gh-proxy.com}"
 PYPI_MIRROR="${UV_PYPI_MIRROR:-https://pypi.tuna.tsinghua.edu.cn/simple}"
 UV_REPO="astral-sh/uv"
 TEMPLATES_DIR="templates"
@@ -29,8 +29,11 @@ fetch_file() {
     proxied_url=$(echo "$url" | sed "s|https://github.com|$DOWNLOAD_PROXY/https://github.com|")
     say "Fetching $proxied_url..."
     if ! curl -#fL "$proxied_url" -o "$dest"; then
-        echo "Error: Failed to fetch $proxied_url" >&2
-        exit 1
+        say "Proxy failed, retrying from GitHub..."
+        if ! curl -#fL "$url" -o "$dest"; then
+            echo "Error: Failed to fetch $url" >&2
+            exit 1
+        fi
     fi
 }
 
@@ -50,13 +53,12 @@ generate_shell_installer() {
     tmp_proxied=$(mktemp)
     sed -e "s|APP_VERSION=\"\([0-9\.]\+\)\"|APP_VERSION=\"\${UV_VERSION:-\\1}\"|" -e "s|astral-sh\/uv\/releases\/download\/.\+\"|astral-sh\/uv\/releases\/download\/\$APP_VERSION\"|" -e \
         "s|\(\"release_type\":\"github\"\},\)\"version\":\".\+\"\}$|\1\"version\"\:\"\$APP_VERSION\"\}|" -e "
-/^# Look for GitHub Enterprise-style base URL first/a\\
+/^APP_VERSION=/a\\
 \\
 # --- Customization: Define runtime proxy URL ---\\
 _UV_DOWNLOAD_PROXY_URL=\"\${UV_DOWNLOAD_PROXY:-$DOWNLOAD_PROXY}\"\\
+UV_INSTALLER_GITHUB_BASE_URL=\"\${UV_INSTALLER_GITHUB_BASE_URL:-\${_UV_DOWNLOAD_PROXY_URL}/https://github.com}\"\\
 # --- Customization End ---
-" -e "
-s|INSTALLER_BASE_URL=\"\${UV_INSTALLER_GITHUB_BASE_URL:-https://github.com}\"|INSTALLER_BASE_URL=\"\${UV_INSTALLER_GITHUB_BASE_URL:-\${_UV_DOWNLOAD_PROXY_URL}/https://github.com}\"|
 " "$tmp_installer" >"$tmp_proxied"
 
     # 2. Rebuild the script with the mirror injection from template
@@ -106,10 +108,9 @@ generate_powershell_installer() {
 /^\$app_version/a\\
 \\
 # --- Customization: Define runtime proxy URL ---\\
-if (\$env:UV_DOWNLOAD_PROXY) { \$uv_download_proxy_url = \$env:UV_DOWNLOAD_PROXY } else { \$uv_download_proxy_url = \"https://ghfast.top\" }\\
+if (\$env:UV_DOWNLOAD_PROXY) { \$uv_download_proxy_url = \$env:UV_DOWNLOAD_PROXY } else { \$uv_download_proxy_url = \"$DOWNLOAD_PROXY\" }\\
+if (-not \$env:UV_INSTALLER_GITHUB_BASE_URL) { \$env:UV_INSTALLER_GITHUB_BASE_URL = \"\$uv_download_proxy_url/https://github.com\" }\\
 # --- Customization End ---
-" -e "
-s|\$installer_base_url = \"https://github.com\"|\$installer_base_url = \"\$uv_download_proxy_url/https://github.com\"|
 " -e "s|$(grep "\$app_version = " "$tmp_installer")|if \(\$env:UV_VERSION\) \{ \$app_version = \$env:UV_VERSION \} else \{ \$app_version = \"$version\" \}|" -e "s|\(\$installer_base_url\/astral-sh\/uv\/releases\/download\/\).\+\"|\1\$app_version\"|" -e "s|\(\"release_type\":\"github\"\},\)\"version\":\".\+\"\}$|\1\"version\"\:\"\$app_version\"\}|" "$tmp_installer" >"$tmp_proxied"
 
     # 2. Rebuild the script with all custom logic injected from the template

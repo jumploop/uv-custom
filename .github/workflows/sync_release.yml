@@ -3,7 +3,7 @@ name: Sync UV Release to GitHub & Gitee
 on:
   workflow_dispatch:
   schedule:
-    - cron: '* */4 * * *'
+    - cron: '*/5 * * * *'
 
 jobs:
   check_for_updates:
@@ -90,6 +90,8 @@ jobs:
     needs: check_for_updates
     if: needs.check_for_updates.outputs.proceed == 'true'
     runs-on: ubuntu-latest
+    env:
+      UV_DOWNLOAD_PROXY: https://gh-proxy.com
     permissions:
       contents: write
     steps:
@@ -97,8 +99,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate custom installers
-        env:
-          DOWNLOAD_PROXY: ${{ vars.DOWNLOAD_PROXY }}
         run: |
           chmod +x ./create_custom_uv_installer.sh
           ./create_custom_uv_installer.sh ${{ needs.check_for_updates.outputs.new_tag }}
