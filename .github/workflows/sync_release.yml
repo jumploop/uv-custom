@@ -227,7 +227,9 @@ jobs:
           retention-days: 3
 
   test_installers:
-    needs: build_installers
+    needs:
+      - check_for_updates
+      - build_installers
     strategy:
       fail-fast: false
       matrix:
