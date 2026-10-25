@@ -290,6 +290,57 @@ jobs:
           name: uv-custom-release
           path: dist
 
+      - name: Sync Gitee branch and tag
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITEE_OWNER: "jumploop"
+          GITEE_REPO: "uv-custom"
+          RELEASE_TAG: ${{ needs.check_for_updates.outputs.new_tag }}
+          REPLACE_ASSETS: ${{ inputs.replace_assets || 'false' }}
+        run: |
+          set -euo pipefail
+          SYNC_DIR=$(mktemp -d)
+          ASKPASS="$SYNC_DIR/askpass.sh"
+          trap 'rm -rf "$SYNC_DIR"' EXIT HUP INT TERM
+          cat > "$ASKPASS" <<'EOF'
+          #!/bin/sh
+          case "$1" in
+            *Username*) printf '%s\n' "$GITEE_OWNER" ;;
+            *Password*) printf '%s\n' "$GITEE_TOKEN" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "$ASKPASS"
+
+          GITEE_REMOTE="https://gitee.com/$GITEE_OWNER/$GITEE_REPO.git"
+          echo "Syncing Gitee main to $GITHUB_SHA..."
+          GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0 \
+            git push "$GITEE_REMOTE" "$GITHUB_SHA:refs/heads/main"
+
+          TAG_REFS=$(GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0 \
+            git ls-remote --tags "$GITEE_REMOTE" \
+              "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}")
+          TAG_REF=$(awk -v ref="refs/tags/$RELEASE_TAG" '$2 == ref {print $1; exit}' <<< "$TAG_REFS")
+          TAG_COMMIT=$(awk -v ref="refs/tags/$RELEASE_TAG^{}" '$2 == ref {print $1; exit}' <<< "$TAG_REFS")
+          TAG_COMMIT="${TAG_COMMIT:-$TAG_REF}"
+
+          if [ -z "$TAG_REF" ]; then
+            echo "Creating Gitee tag $RELEASE_TAG..."
+            GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0 \
+              git push "$GITEE_REMOTE" "$GITHUB_SHA:refs/tags/$RELEASE_TAG"
+          elif [ "$TAG_COMMIT" = "$GITHUB_SHA" ]; then
+            echo "Gitee tag $RELEASE_TAG already points to $GITHUB_SHA."
+          elif [ "$REPLACE_ASSETS" = "true" ]; then
+            echo "Replacing Gitee tag $RELEASE_TAG with explicit lease..."
+            GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0 \
+              git push --force-with-lease="refs/tags/$RELEASE_TAG:$TAG_REF" \
+                "$GITEE_REMOTE" "$GITHUB_SHA:refs/tags/$RELEASE_TAG"
+          else
+            echo "Gitee tag $RELEASE_TAG points to $TAG_COMMIT, not $GITHUB_SHA." >&2
+            echo "Use replace_assets=true to replace it explicitly." >&2
+            exit 1
+          fi
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
