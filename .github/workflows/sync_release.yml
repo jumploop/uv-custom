@@ -2,6 +2,17 @@ name: Sync UV Release to GitHub & Gitee
 
 on:
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force build, installer tests, and release checks even when versions match'
+        required: false
+        default: false
+        type: boolean
+      replace_assets:
+        description: 'Replace existing release assets after all installer tests pass'
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: '*/5 * * * *'
 
@@ -26,15 +37,24 @@ jobs:
       - name: Get latest uv release version
         id: get_uv_version
         run: |
-          LATEST_UV_JSON=$(curl -sL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/astral-sh/uv/releases/latest)
-          LATEST_UV_TAG=$(echo "$LATEST_UV_JSON" | jq -r .tag_name)
-          echo "tag=$LATEST_UV_TAG" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          LATEST_UV_JSON=$(curl -fsSL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/astral-sh/uv/releases/latest)
+          LATEST_UV_TAG=$(jq -er '.tag_name' <<<"$LATEST_UV_JSON")
+          [[ "$LATEST_UV_TAG" =~ ^[0-9A-Za-z._-]+$ ]] || {
+            echo "Invalid upstream tag: $LATEST_UV_TAG" >&2
+            exit 1
+          }
+          echo "tag=$LATEST_UV_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Get latest GitHub local release version
         id: get_github_local_version
         run: |
-          LATEST_GITHUB_TAG=$(curl -sL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
-          echo "tag=$LATEST_GITHUB_TAG" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          LATEST_GITHUB_TAG=$(curl -fsSL \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/releases/latest |
+            jq -er '.tag_name')
+          echo "tag=$LATEST_GITHUB_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Get latest Gitee local release version
         id: get_gitee_local_version
@@ -54,7 +74,7 @@ jobs:
             -w '%{http_code}' \
             -H "Content-Type: application/json;charset=UTF-8" \
             -H "Accept: application/json" \
-            -H "User-Agent: uv-custom-sync-release/1.0" \
+            -H "User-Agent: uv-custom-sync-release/2.0" \
             -o "$RESPONSE_FILE" \
             "$API_URL")
 
@@ -77,51 +97,61 @@ jobs:
 
       - name: Compare versions and decide to proceed
         id: compare_versions
+        env:
+          FORCE_SYNC: ${{ inputs.force || 'false' }}
+          UPSTREAM_TAG: ${{ steps.get_uv_version.outputs.tag }}
+          GITHUB_TAG: ${{ steps.get_github_local_version.outputs.tag }}
+          GITEE_TAG: ${{ steps.get_gitee_local_version.outputs.tag }}
         run: |
-          echo "Latest uv release: ${{ steps.get_uv_version.outputs.tag }}"
-          echo "Latest GitHub local release: ${{ steps.get_github_local_version.outputs.tag }}"
-          echo "Latest Gitee local release: ${{ steps.get_gitee_local_version.outputs.tag }}"
-          if [ "${{ steps.get_uv_version.outputs.tag }}" = "${{ steps.get_github_local_version.outputs.tag }}" ] && \
-             [ "${{ steps.get_uv_version.outputs.tag }}" = "${{ steps.get_gitee_local_version.outputs.tag }}" ]; then
+          echo "Latest uv release: $UPSTREAM_TAG"
+          echo "Latest GitHub local release: $GITHUB_TAG"
+          echo "Latest Gitee local release: $GITEE_TAG"
+          if [ "$FORCE_SYNC" = "true" ]; then
+            echo "Forced run requested. Proceeding with build and installer tests."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          elif [ "$UPSTREAM_TAG" = "$GITHUB_TAG" ] && [ "$UPSTREAM_TAG" = "$GITEE_TAG" ]; then
             echo "All repositories are up-to-date. No new release needed."
-            echo "proceed=false" >> $GITHUB_OUTPUT
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
           else
             echo "New version detected or repositories are out of sync. Proceeding with release."
-            echo "proceed=true" >> $GITHUB_OUTPUT
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
           fi
 
-  create_releases:
+  build_installers:
     needs: check_for_updates
     if: needs.check_for_updates.outputs.proceed == 'true'
     runs-on: ubuntu-latest
     env:
       UV_DOWNLOAD_PROXY: https://gh-proxy.com
-    permissions:
-      contents: write
+      UV_PYPI_MIRROR: https://pypi.tuna.tsinghua.edu.cn/simple
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Generate custom installers
+      - name: Generate stable installer wrappers
         run: |
           chmod +x ./create_custom_uv_installer.sh
-          ./create_custom_uv_installer.sh ${{ needs.check_for_updates.outputs.new_tag }}
+          ./create_custom_uv_installer.sh "${{ needs.check_for_updates.outputs.new_tag }}"
 
-      - name: Generate Unified Release Notes
-        id: generate_notes
+      - name: Prepare release assets
         run: |
+          mkdir -p dist
+          cp uv-installer-custom.sh uv-installer-custom.ps1 setup_hooks.sh setup_hooks.ps1 dist/
+
           RELEASE_TAG="${{ needs.check_for_updates.outputs.new_tag }}"
           GITHUB_REPO_URL="https://github.com/${{ github.repository }}"
           GITEE_REPO_URL="https://gitee.com/jumploop/uv-custom"
 
-          cat > release_notes.md <<EOF
+          cat > dist/release_notes.md <<EOF
           ## 🚀 uv 国内加速版 (同步自 uv官方版本 [$RELEASE_TAG](https://github.com/astral-sh/uv/releases/tag/$RELEASE_TAG))
 
           这是一个与 uv 官方版本同步的镜像版本，为国内用户提供了以下优化：
 
-          - **下载加速**：所有 GitHub 下载链接均通过镜像代理，大幅提升下载速度。
-          - **预设镜像**：自动为您配置清华大学 PyPI 镜像和 Python 构建镜像。
-          - **灵活配置**：支持通过环境变量临时覆盖默认的下载代理和 PyPI 镜像。
+          - **稳定包装器**：生成器不再修改上游安装器内部代码，而是下载与目标版本完全匹配的官方安装器。
+          - **下载加速**：所有 GitHub 下载链接均通过镜像代理，并在代理不可用时自动回退 GitHub 直连。
+          - **预设镜像**：自动为您配置清华大学 PyPI 镜像和 Python 构建镜像，已有 \`uv.toml\` 不会被覆盖。
+          - **发布门禁**：每个版本发布前会在 Linux、macOS、Windows 上执行真实安装与版本切换测试。
+          - **灵活配置**：支持通过环境变量临时覆盖默认的下载代理、PyPI 镜像和 uv 版本。
 
           ---
 
@@ -153,11 +183,11 @@ jobs:
 
           ### 高级用法：自定义镜像源
 
-          您可以在运行一键安装命令前，通过设置环境变量来临时指定下载代理和 PyPI 镜像。并可以选择下载不同的uv版本。
+          您可以在运行一键安装命令前，通过设置环境变量来临时指定下载代理和 PyPI 镜像，并选择下载不同的 uv 版本。
 
           - \`UV_DOWNLOAD_PROXY\`: 用于 \`uv\` 和 Python 的下载代理 (例如: \`https://gh-proxy.com\`)
           - \`UV_PYPI_MIRROR\`: PyPI 镜像源 (例如: \`https://mirrors.aliyun.com/pypi/simple/\`)
-          - \`UV_VERSION\`: 选择下载不同的uv版本 (例如: \`0.7.19\`)
+          - \`UV_VERSION\`: 选择下载不同的 uv 版本 (例如: \`0.7.19\`)
 
           #### macOS / Linux 示例
           \`\`\`sh
@@ -188,41 +218,124 @@ jobs:
           \`\`\`
           EOF
 
+      - name: Upload release assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: uv-custom-release
+          path: dist/
+          if-no-files-found: error
+          retention-days: 3
+
+  test_installers:
+    needs: build_installers
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            installer: shell
+          - os: macos-latest
+            installer: shell
+          - os: windows-latest
+            installer: powershell
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Download release assets
+        uses: actions/download-artifact@v8
+        with:
+          name: uv-custom-release
+          path: dist
+
+      - name: Test shell installer
+        if: matrix.installer == 'shell'
+        env:
+          EXPECTED_VERSION: ${{ needs.check_for_updates.outputs.new_tag }}
+          OLD_VERSION: '0.7.19'
+        run: |
+          chmod +x tests/test_shell_installer.sh
+          tests/test_shell_installer.sh dist/uv-installer-custom.sh "$EXPECTED_VERSION"
+
+      - name: Test PowerShell installer
+        if: matrix.installer == 'powershell'
+        env:
+          EXPECTED_VERSION: ${{ needs.check_for_updates.outputs.new_tag }}
+          OLD_VERSION: '0.7.19'
+        run: |
+          ./tests/test_powershell_installer.ps1 `
+            -InstallerPath dist/uv-installer-custom.ps1 `
+            -ExpectedVersion $env:EXPECTED_VERSION `
+            -OldVersion $env:OLD_VERSION
+
+  create_releases:
+    needs:
+      - check_for_updates
+      - build_installers
+      - test_installers
+    if: needs.check_for_updates.outputs.proceed == 'true' && needs.test_installers.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Download tested release assets
+        uses: actions/download-artifact@v8
+        with:
+          name: uv-custom-release
+          path: dist
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.check_for_updates.outputs.new_tag }}
+          RELEASE_DIR: dist
+          REPLACE_ASSETS: ${{ inputs.replace_assets || 'false' }}
         run: |
           if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             echo "Release $RELEASE_TAG already exists on GitHub. Ensuring assets are present."
+            if [ "$REPLACE_ASSETS" = "true" ]; then
+              echo "Replacing release notes and existing assets."
+              gh release edit "$RELEASE_TAG" --notes-file "$RELEASE_DIR/release_notes.md"
+            fi
             EXISTING_GITHUB_ASSETS=$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')
             for asset in uv-installer-custom.sh uv-installer-custom.ps1 setup_hooks.sh setup_hooks.ps1; do
               if grep -Fxq "$asset" <<< "$EXISTING_GITHUB_ASSETS"; then
-                echo "Skipping existing asset: $asset"
+                if [ "$REPLACE_ASSETS" = "true" ]; then
+                  echo "Replacing existing asset: $asset"
+                  gh release upload "$RELEASE_TAG" "$RELEASE_DIR/$asset" --clobber
+                else
+                  echo "Skipping existing asset: $asset"
+                fi
               else
-                gh release upload "$RELEASE_TAG" "$asset"
+                gh release upload "$RELEASE_TAG" "$RELEASE_DIR/$asset"
               fi
             done
           else
             echo "Creating GitHub release $RELEASE_TAG..."
             gh release create "$RELEASE_TAG" \
               --title "$RELEASE_TAG" \
-              --notes-file release_notes.md \
-              uv-installer-custom.sh \
-              uv-installer-custom.ps1 \
-              setup_hooks.sh \
-              setup_hooks.ps1
+              --notes-file "$RELEASE_DIR/release_notes.md" \
+              "$RELEASE_DIR/uv-installer-custom.sh" \
+              "$RELEASE_DIR/uv-installer-custom.ps1" \
+              "$RELEASE_DIR/setup_hooks.sh" \
+              "$RELEASE_DIR/setup_hooks.ps1"
           fi
 
       - name: Create Gitee Release
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
           RELEASE_TAG: ${{ needs.check_for_updates.outputs.new_tag }}
+          RELEASE_DIR: dist
+          REPLACE_ASSETS: ${{ inputs.replace_assets || 'false' }}
           GITEE_OWNER: "jumploop"
           GITEE_REPO: "uv-custom"
         run: |
           set -euo pipefail
-          JSON_NOTES=$(jq -R -s '.' < release_notes.md)
+          JSON_NOTES=$(jq -R -s '.' < "$RELEASE_DIR/release_notes.md")
 
           gitee_request() {
             local response
@@ -268,7 +381,7 @@ jobs:
               --arg tag "$RELEASE_TAG" \
               --argjson notes "$JSON_NOTES" \
               '{access_token: $token, tag_name: $tag, name: $tag, body: $notes, target_commitish: "main"}')
-            
+
             CREATE_RESPONSE=$(gitee_request -X POST --header 'Content-Type: application/json;charset=UTF-8' \
               "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases" -d "$RELEASE_PAYLOAD")
 
@@ -288,13 +401,24 @@ jobs:
           echo "Ensuring assets are uploaded to Gitee Release ID: $RELEASE_ID..."
           for asset in uv-installer-custom.sh uv-installer-custom.ps1 setup_hooks.sh setup_hooks.ps1; do
             if [ "$ASSET_COUNT" -gt 0 ] && echo "$EXISTING_RELEASE_RESPONSE" | jq -e --arg name "$asset" '.assets[] | select(.name == $name)' > /dev/null; then
-              echo "Skipping existing asset: $asset"
-              continue
+              if [ "$REPLACE_ASSETS" = "true" ]; then
+                ASSET_ID=$(echo "$EXISTING_RELEASE_RESPONSE" | jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .id')
+                if [ -z "$ASSET_ID" ] || [ "$ASSET_ID" = "null" ]; then
+                  echo "Failed to find Gitee asset ID for $asset." >&2
+                  exit 1
+                fi
+                echo "Replacing existing asset: $asset"
+                gitee_request -X DELETE \
+                  "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/$RELEASE_ID/attach_files/$ASSET_ID?access_token=$GITEE_TOKEN" > /dev/null
+              else
+                echo "Skipping existing asset: $asset"
+                continue
+              fi
             fi
             echo "Uploading $asset..."
             gitee_request -X POST --header "Content-Type: multipart/form-data" \
               -F "access_token=$GITEE_TOKEN" \
-              -F "file=@$asset" \
+              -F "file=@$RELEASE_DIR/$asset" \
               "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/$RELEASE_ID/attach_files" > /dev/null
           done
           echo "All assets uploaded to Gitee."
