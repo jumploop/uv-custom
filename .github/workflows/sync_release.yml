@@ -341,18 +341,12 @@ jobs:
 
           gitee_request() {
             local response
-            response=$(curl -sS --fail "$@") || return 1
+            response=$(curl -sS --fail-with-body "$@") || {
+              printf '%s\n' "$response" >&2
+              return 1
+            }
             printf '%s' "$response"
           }
-
-          if gitee_request "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/tags/$RELEASE_TAG?access_token=$GITEE_TOKEN" > /dev/null; then
-            echo "Tag $RELEASE_TAG already exists on Gitee. Skipping tag creation."
-          else
-            echo "Creating Gitee Tag..."
-            gitee_request -X POST --header 'Content-Type: application/json;charset=UTF-8' \
-              "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/tags" \
-              -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"$RELEASE_TAG\",\"refs\":\"main\",\"tag_message\":\"Release $RELEASE_TAG\"}" > /dev/null
-          fi
 
           RELEASE_RESPONSE_FILE=$(mktemp)
           RELEASE_HTTP_CODE=$(curl -sS \
@@ -388,11 +382,19 @@ jobs:
               "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases" -d "$RELEASE_PAYLOAD")
 
             RELEASE_ID=$(echo "$CREATE_RESPONSE" | jq -r .id)
-            ASSET_COUNT=0
           else
             echo "Found existing Gitee release with ID: $RELEASE_ID."
-            ASSET_COUNT=$(echo "$EXISTING_RELEASE_RESPONSE" | jq '.assets | length')
-            echo "It has $ASSET_COUNT assets."
+            if [ "$REPLACE_ASSETS" = "true" ]; then
+              echo "Replacing Gitee release notes."
+              UPDATE_PAYLOAD=$(jq -n \
+                --arg token "$GITEE_TOKEN" \
+                --arg tag "$RELEASE_TAG" \
+                --argjson notes "$JSON_NOTES" \
+                '{access_token: $token, tag_name: $tag, name: $tag, body: $notes, prerelease: false}')
+              gitee_request -X PATCH --header 'Content-Type: application/json;charset=UTF-8' \
+                "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/$RELEASE_ID" \
+                -d "$UPDATE_PAYLOAD" > /dev/null
+            fi
           fi
 
           if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
@@ -400,15 +402,14 @@ jobs:
             exit 1
           fi
 
+          ATTACHMENTS_RESPONSE=$(gitee_request \
+            "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/$RELEASE_ID/attach_files?access_token=$GITEE_TOKEN&per_page=100&direction=asc")
+
           echo "Ensuring assets are uploaded to Gitee Release ID: $RELEASE_ID..."
           for asset in uv-installer-custom.sh uv-installer-custom.ps1 setup_hooks.sh setup_hooks.ps1; do
-            if [ "$ASSET_COUNT" -gt 0 ] && echo "$EXISTING_RELEASE_RESPONSE" | jq -e --arg name "$asset" '.assets[] | select(.name == $name)' > /dev/null; then
+            ASSET_ID=$(echo "$ATTACHMENTS_RESPONSE" | jq -r --arg name "$asset" '[.[] | select(.name == $name)][0].id // empty')
+            if [ -n "$ASSET_ID" ]; then
               if [ "$REPLACE_ASSETS" = "true" ]; then
-                ASSET_ID=$(echo "$EXISTING_RELEASE_RESPONSE" | jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .id')
-                if [ -z "$ASSET_ID" ] || [ "$ASSET_ID" = "null" ]; then
-                  echo "Failed to find Gitee asset ID for $asset." >&2
-                  exit 1
-                fi
                 echo "Replacing existing asset: $asset"
                 gitee_request -X DELETE \
                   "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/$RELEASE_ID/attach_files/$ASSET_ID?access_token=$GITEE_TOKEN" > /dev/null
