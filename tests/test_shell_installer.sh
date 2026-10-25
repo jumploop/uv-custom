@@ -11,6 +11,15 @@ die() {
     exit 1
 }
 
+assert_uv_version() {
+    _uv_path="$1"
+    _expected="$2"
+    _output=$("$_uv_path" --version) || die "failed to run $_uv_path"
+    set -- $_output
+    [ "$1" = "uv" ] && [ "$2" = "$_expected" ] ||
+        die "expected uv $_expected, got: $_output"
+}
+
 TMP_DIR=$(mktemp -d)
 cleanup() {
     rm -rf "$TMP_DIR"
@@ -27,8 +36,7 @@ mkdir -p "$HOME"
 unset UV_VERSION
 unset UV_DOWNLOAD_PROXY
 UV_UNMANAGED_INSTALL="$TMP_DIR/current" sh "$INSTALLER_PATH" --quiet
-"$TMP_DIR/current/uv" --version | grep -F "uv $EXPECTED_VERSION " >/dev/null ||
-    die "default install did not produce uv $EXPECTED_VERSION"
+assert_uv_version "$TMP_DIR/current/uv" "$EXPECTED_VERSION"
 
 CONFIG_PATH="$XDG_CONFIG_HOME/uv/uv.toml"
 [ -f "$CONFIG_PATH" ] || die "uv.toml was not created"
@@ -45,8 +53,7 @@ else
     unset UV_DOWNLOAD_PROXY
 fi
 UV_UNMANAGED_INSTALL="$TMP_DIR/old" sh "$INSTALLER_PATH" --quiet
-"$TMP_DIR/old/uv" --version | grep -F "uv $OLD_VERSION " >/dev/null ||
-    die "version override or direct-download fallback failed"
+assert_uv_version "$TMP_DIR/old/uv" "$OLD_VERSION"
 
 [ "$(cat "$CONFIG_PATH")" = "sentinel" ] ||
     die "existing uv.toml was overwritten"
