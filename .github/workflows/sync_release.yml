@@ -283,6 +283,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Download tested release assets
         uses: actions/download-artifact@v8
@@ -313,9 +315,20 @@ jobs:
           chmod 700 "$ASKPASS"
 
           GITEE_REMOTE="https://gitee.com/$GITEE_OWNER/$GITEE_REPO.git"
-          echo "Syncing Gitee main to $GITHUB_SHA..."
           GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0 \
-            git push "$GITEE_REMOTE" "$GITHUB_SHA:refs/heads/main"
+            git fetch --no-tags "$GITEE_REMOTE" "refs/heads/main:refs/remotes/gitee/main"
+          GITEE_MAIN=$(git rev-parse refs/remotes/gitee/main)
+          if [ "$GITEE_MAIN" = "$GITHUB_SHA" ]; then
+            echo "Gitee main already points to $GITHUB_SHA."
+          elif git merge-base --is-ancestor "$GITEE_MAIN" "$GITHUB_SHA"; then
+            echo "Syncing Gitee main to $GITHUB_SHA..."
+            GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0 \
+              git push "$GITEE_REMOTE" "$GITHUB_SHA:refs/heads/main"
+          else
+            echo "Gitee main has changes that are not in $GITHUB_SHA." >&2
+            echo "Merge them manually before creating the release." >&2
+            exit 1
+          fi
 
           TAG_REFS=$(GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0 \
             git ls-remote --tags "$GITEE_REMOTE" \
