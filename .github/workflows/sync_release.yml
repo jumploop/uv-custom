@@ -71,6 +71,10 @@ jobs:
 
           RESPONSE_FILE=$(mktemp)
           HTTP_CODE=$(curl -sS \
+            --retry 5 \
+            --retry-all-errors \
+            --retry-delay 2 \
+            --connect-timeout 20 \
             -w '%{http_code}' \
             -H "Content-Type: application/json;charset=UTF-8" \
             -H "Accept: application/json" \
